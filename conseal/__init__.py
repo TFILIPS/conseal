@@ -21,6 +21,7 @@ from . import F5
 from . import juniward
 from . import nsF5
 from . import uerd
+from . import jsideinfo
 
 
 # abbreviations of enum
@@ -54,6 +55,7 @@ __all__ = [
     'hill',
     'hugo',
     'juniward',
+    'jsideinfo',
     'lsb',
     'mipod',
     'nsF5',

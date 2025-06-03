@@ -3,23 +3,28 @@
 Author: Benedikt Lorch, Martin Benes, Thomas Filips
 Affiliation: University of Innsbruck
 """
+from typing import Callable
 
 import numpy as np
-
+from ._costmap import compute_cost_adjusted, Method
 from .. import simulate
 from .. import tools
 
 
-def simulate(
+def simulate_single_channel(
     x0: np.ndarray,
+    y0: np.ndarray,
+    qt: np.ndarray,
     alpha: float,
+    cost_fn: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]] = None,
     *,
+    method: Method = Method.LIBJPEG_ISLOW,
+    dry_cost: float = 50.0,
     wet_cost: float = 10**13,
-    dtype: np.dtype = np.float64,
     generator: str = None,
     seed: int = None,
 ) -> np.ndarray:
-    # Count number of embeddable DCT coefficients
+    # Count the number of embeddable DCT coefficients
     nzAC = tools.dct.nzAC(y0)
 
     if nzAC == 0:
@@ -31,8 +36,9 @@ def simulate(
         x0=x0,
         y0=y0,
         qt=qt,
-        dtype=dtype,
-        implementation=implementation,
+        cost_fn=cost_fn,
+        method=method,
+        dry_cost=dry_cost,
         wet_cost=wet_cost,
     )
 
