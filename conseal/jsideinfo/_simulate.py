@@ -19,7 +19,7 @@ def simulate_single_channel(
     cost_fn: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]] = None,
     *,
     method: Method = Method.LIBJPEG_ISLOW,
-    dry_cost: float = 50.0,
+    dry_cost: float = 0.1,
     wet_cost: float = 10**13,
     generator: str = None,
     seed: int = None,

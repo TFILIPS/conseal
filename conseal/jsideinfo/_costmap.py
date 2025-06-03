@@ -73,7 +73,7 @@ def compute_cost_adjusted(
     cost_fn: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]] = None,
     *,
     method: Method = Method.LIBJPEG_ISLOW,
-    dry_cost: float = 50.0,
+    dry_cost: float = 0.1,
     wet_cost: float = 10**13,
 ) -> typing.Tuple[np.ndarray, np.ndarray]:
     # Count the number of embeddable DCT coefficients
@@ -89,15 +89,19 @@ def compute_cost_adjusted(
 
     rho_p1, rho_m1 = cost_fn(unquantized_coefficients)
 
-    rho_p1[qe > 0] *= (1 - 2 * np.abs(qe[qe > 0]))
     # Costs, which approach 0, cause over-embedding and increase detectability for small embedding rates
-    rho_p1[rho_p1 < dry_cost] = dry_cost
+    # Also prevents cost from getting negative because qe can be slightly higher than 0.5, due to
+    # different precisions
+    rho_p1[qe > 0] *= np.maximum(1 - 2 * np.abs(qe[qe > 0]), dry_cost)
+
     # Do not embed +1 if the DCT coefficient has max value
     rho_p1[y0 >= 1023] = wet_cost
 
-    rho_m1[qe < 0] *= (1 - 2 * np.abs(qe[qe < 0]))
     # Costs, which approach 0, cause over-embedding and increase detectability for small embedding rates
-    rho_m1[rho_m1 < dry_cost] = dry_cost
+    # Also prevents cost from getting negative because qe can be slightly higher than 0.5, due to
+    # different precisions
+    rho_m1[qe < 0] *= np.maximum(1 - 2 * np.abs(qe[qe < 0]), dry_cost)
+
     # Do not embed -1 if the DCT coefficient has min value
     rho_m1[y0 <= -1023] = wet_cost
 
