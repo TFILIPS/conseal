@@ -1,19 +1,6 @@
 """
-Implementation of the J-UNIWARD steganography method as described in
-
-V. Holub, J. Fridrich, T. Denemark
-"Universal distortion function for steganography in an arbitrary domain"
-EURASIP Journal on Information Security, 2014
-http://www.ws.binghamton.edu/fridrich/research/uniward-eurasip-final.pdf
-
 Author: Benedikt Lorch, Martin Benes, Thomas Filips
 Affiliation: University of Innsbruck
-
-This implementation builds on the original Matlab implementation provided by the paper authors. Please find that license of the original implementation below.
--------------------------------------------------------------------------
-Copyright (c) 2013 DDE Lab, Binghamton University, NY. All Rights Reserved.
-Permission to use, copy, modify, and distribute this software for educational, research and non-profit purposes, without fee, and without a written agreement is hereby granted, provided that this copyright notice appears in all copies. The program is supplied "as is," without any accompanying services from DDE Lab. DDE Lab does not warrant the operation of the program will be uninterrupted or error-free. The end-user understands that the program was developed for research purposes and is advised not to rely exclusively on the program for any reason. In no event shall Binghamton University or DDE Lab be liable to any party for direct, indirect, special, incidental, or consequential damages, including lost profits, arising out of the use of this software. DDE Lab disclaims any warranties, and has no obligations to provide maintenance, support, updates, enhancements or modifications.
--------------------------------------------------------------------------
 """  # noqa: E501
 import enum
 from typing import Callable
@@ -36,6 +23,15 @@ class Method(enum.Enum):
 
 
 def naive_dct(x0):
+    """Naive scipy.fftpack block DCT implementation that mimics the JPEG DCT calculation
+
+    :param x0: pixel values of pre-cover image
+        of shape [height, width]
+    :type x0: `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    :return: unquantized_coefficients,
+        of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
+    :rtype: tuple of `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    """
     block_size = 8
 
     x0 = x0.astype(float) - 128
@@ -53,7 +49,24 @@ def naive_dct(x0):
     return dct_coeffs
 
 
-def compute_unquantized_coefficients(x0, qt, method: Method = Method.LIBJPEG_ISLOW) -> np.array:
+def compute_unquantized_coefficients(
+        x0: np.ndarray,
+        qt: np.ndarray,
+        method: Method = Method.LIBJPEG_ISLOW
+) -> np.array:
+    """Compute the unquantized coefficients of the pre-cover. Either by using a naive DCT implementation
+    or by extracting them directly from libjpeg.
+
+    :param x0: pixel values of pre-cover image
+        of shape [height, width]
+    :type x0: `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    :param qt: quantization table of shape [8, 8]
+    :type qt: `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    :param method: choose the method that is used to extract the unquantized dct coefficients
+    :return: unquantized_coefficients divided by the quantization table,
+        of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
+    :rtype: tuple of `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    """
     if method == Method.LIBJPEG_ISLOW:
         jpeg = jpeglib.from_spatial(x0[:, :, None])
         jpeg.samp_factor = "4:4:4"
@@ -76,6 +89,42 @@ def compute_cost_adjusted(
     dry_cost: float = 0.1,
     wet_cost: float = 10**13,
 ) -> typing.Tuple[np.ndarray, np.ndarray]:
+    """Compute the adjusted cost for J-SIDEINFO tenary embedding.
+
+    :param x0: pixel values of pre-cover image
+        of shape [height, width]
+    :type x0: `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    :param y0: quantized cover DCT coefficients
+        of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
+    :type y0: `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    :param qt: quantization table of shape [8, 8]
+    :type qt: `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    :param cost_fn: Cost function used for calculating the base cost. It provides access to the
+        unquntized coefficiets, which therefore can be integrated in the cost calculation.
+    :type cost_fn: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]]
+    :param method: choose the method that is used to extract the unquantized dct coefficients
+    :param dry_cost: Limits the downscaling of the cost. Should not be set to 0
+    :type dry_cost: float
+    :param wet_cost: wet cost for unembeddable coefficients
+    :type wet_cost: float
+    :return: embedding costs of +1 and -1 changes,
+        of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
+    :rtype: tuple of `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+
+    :Example:
+
+    >>> with Image.open(input_path) as img:
+    ...    spatial = np.expand_dims(np.array(img.convert("L"), "uint8"), axis=-1)
+    ...    jpeg = jpeglib.from_spatial(spatial)
+    ...    jpeg.write_spatial(output_file_name, qt=quality)
+    ...    jpeg = jpeglib.read_dct(output_file_name)
+    ...    rho_p1, rho_m1 = cl.jsideinfo.compute_cost_adjusted(
+    ...        x0=spatial[..., 0],
+    ...        y0=jpeg.Y,
+    ...        qt=jpeg.qt[0],
+    ...        method=Method.LIBJPEG_ISLOW
+    ...    )
+    """
     # Count the number of embeddable DCT coefficients
     assert tools.dct.nzAC(y0) > 0, 'Expected non-zero AC coefficients'
 

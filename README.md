@@ -38,19 +38,20 @@ pip3 install .
 
 ## Contents
 
-| Steganography method | Domain | Reference |
-| --- | --- | --- |
-| F5 | JPEG | [Reference](https://doi.org/10.1007/3-540-45496-9_21) |
-| nsF5: no-shrinkage F5 | JPEG | [Reference](https://dde.binghamton.edu/kodovsky/pdf/Fri07-ACM.pdf) |
-| EBS: entropy block steganography | JPEG | [Reference](https://doi.org/10.1109/ICASSP.2012.6288246) |
-| UERD: uniform embedding revisited distortion | JPEG | [Reference](https://doi.org/10.1109/TIFS.2015.2473815) |
-| J-UNIWARD: JPEG-domain universal wavelet relative distortion | JPEG | [Reference](https://dde.binghamton.edu/vholub/pdf/EURASIP14_Universal_Distortion_Function_for_Steganography_in_an_Arbitrary_Domain.pdf) |
-| LSB: least significant bit | Spatial / JPEG | |
-| HILL: high-low-low | Spatial | [Reference](https://projet.liris.cnrs.fr/imagine/pub/proceedings/ICIP-2014/Papers/1569891955.pdf) |
-| HUGO: highly undetectable stego | Spatial | [Reference](http://agents.fel.cvut.cz/stegodata/pdfs/Pev10-Hugo.pdf) |
-| MiPOD: minimizing the power of optimal detector | Spatial | [Reference](https://dde.binghamton.edu/vsedighi/pdf/TIFS2015_Content_Adaptive_Steganography_by_Minimizing_Statistical_Detectability.pdf) |
-| S-UNIWARD: spatial-domain universal wavelet relative distortion | spatial | [Reference](https://dde.binghamton.edu/vholub/pdf/EURASIP14_Universal_Distortion_Function_for_Steganography_in_an_Arbitrary_Domain.pdf) |
-| WOW: wavelet obtained weights | spatial | [Reference](https://dde.binghamton.edu/vholub/pdf/WIFS12_Designing_Steganographic_Distortion_Using_Directional_Filters.pdf) |
+| Steganography method                                                     | Domain | Reference |
+|--------------------------------------------------------------------------| --- | --- |
+| F5                                                                       | JPEG | [Reference](https://doi.org/10.1007/3-540-45496-9_21) |
+| nsF5: no-shrinkage F5                                                    | JPEG | [Reference](https://dde.binghamton.edu/kodovsky/pdf/Fri07-ACM.pdf) |
+| EBS: entropy block steganography                                         | JPEG | [Reference](https://doi.org/10.1109/ICASSP.2012.6288246) |
+| UERD: uniform embedding revisited distortion                             | JPEG | [Reference](https://doi.org/10.1109/TIFS.2015.2473815) |
+| J-UNIWARD: JPEG-domain universal wavelet relative distortion             | JPEG | [Reference](https://dde.binghamton.edu/vholub/pdf/EURASIP14_Universal_Distortion_Function_for_Steganography_in_an_Arbitrary_Domain.pdf) |
+| LSB: least significant bit                                               | Spatial / JPEG | |
+| HILL: high-low-low                                                       | Spatial | [Reference](https://projet.liris.cnrs.fr/imagine/pub/proceedings/ICIP-2014/Papers/1569891955.pdf) |
+| HUGO: highly undetectable stego                                          | Spatial | [Reference](http://agents.fel.cvut.cz/stegodata/pdfs/Pev10-Hugo.pdf) |
+| MiPOD: minimizing the power of optimal detector                          | Spatial | [Reference](https://dde.binghamton.edu/vsedighi/pdf/TIFS2015_Content_Adaptive_Steganography_by_Minimizing_Statistical_Detectability.pdf) |
+| S-UNIWARD: spatial-domain universal wavelet relative distortion          | spatial | [Reference](https://dde.binghamton.edu/vholub/pdf/EURASIP14_Universal_Distortion_Function_for_Steganography_in_an_Arbitrary_Domain.pdf) |
+| WOW: wavelet obtained weights                                            | spatial | [Reference](https://dde.binghamton.edu/vholub/pdf/WIFS12_Designing_Steganographic_Distortion_Using_Directional_Filters.pdf) |
+| J-SIDEINFO: Side informed jpeg embedding with customizable cost function | JPEG | [Reference](https://ieeexplore.ieee.org/abstract/document/7368589) |
 
 ## Usage
 
@@ -244,6 +245,24 @@ x1 = cl.hill.simulate_single_channel(
 
 # save result as stego image
 Image.fromarray(x1).save("stego.png")
+```
+
+- J-SIDEINFO
+
+```python
+with Image.open("pre-cover.pgm") as img:
+    spatial = np.expand_dims(np.array(img.convert("L"), "uint8"), axis=-1)
+    jpeg = jpeglib.from_spatial(spatial)
+    jpeg.write_spatial("cover.jpg", qt=quality)
+    jpeg = jpeglib.read_dct("cover.jpg")
+    jpeg.Y = cl.jsideinfo.simulate_single_channel(
+        x0=spatial[..., 0],
+        y0=jpeg.Y,
+        qt=jpeg.qt[0],
+        alpha=0.3,
+        method=Method.LIBJPEG_ISLOW
+    )
+    jpeg.write_dct("stego.jpg")
 ```
 
 ## Acknowledgements and Disclaimer
