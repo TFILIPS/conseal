@@ -22,6 +22,11 @@ class Method(enum.Enum):
     NAIVE_DCT = enum.auto()
 
 
+class MidpointHandling(enum.Enum):
+    OMIT_EMBEDDING = enum.auto()
+    CLIP_COST_SCALING = enum.auto()
+
+
 def naive_dct(x0):
     """Naive scipy.fftpack block DCT implementation that mimics the JPEG DCT calculation
 
@@ -86,7 +91,8 @@ def compute_cost_adjusted(
     cost_fn: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]] = None,
     *,
     method: Method = Method.LIBJPEG_ISLOW,
-    dry_cost: float = 0.1,
+    midpoint_handling = MidpointHandling.CLIP_COST_SCALING,
+    min_qe_scale_factor: float = 10 ** -3,
     wet_cost: float = 10**13,
 ) -> typing.Tuple[np.ndarray, np.ndarray]:
     """Compute the adjusted cost for J-SIDEINFO tenary embedding.
@@ -103,8 +109,10 @@ def compute_cost_adjusted(
         unquntized coefficiets, which therefore can be integrated in the cost calculation.
     :type cost_fn: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]]
     :param method: choose the method that is used to extract the unquantized dct coefficients
-    :param dry_cost: Limits the downscaling of the cost. Should not be set to 0
-    :type dry_cost: float
+    :param midpoint_handling: choose the midpoint (qe == 0.5) handling strategy
+    :type midpoint_handling: MidpointHandling
+    :param min_qe_scale_factor: Limits the downscaling of the cost.
+    :type min_qe_scale_factor: float
     :param wet_cost: wet cost for unembeddable coefficients
     :type wet_cost: float
     :return: embedding costs of +1 and -1 changes,
@@ -138,19 +146,21 @@ def compute_cost_adjusted(
 
     rho_p1, rho_m1 = cost_fn(unquantized_coefficients)
 
-    # Costs, which approach 0, cause over-embedding and increase detectability for small embedding rates
-    # Also prevents cost from getting negative because qe can be slightly higher than 0.5, due to
-    # different precisions
-    rho_p1[qe > 0] *= np.maximum(1 - 2 * np.abs(qe[qe > 0]), dry_cost)
+    scaling_p1 = 1 - 2 * np.abs(qe[qe > 0])
+    scaling_m1 = 1 - 2 * np.abs(qe[qe < 0])
+
+    if midpoint_handling == MidpointHandling.OMIT_EMBEDDING:
+        rho_p1[qe > 0] = np.where(scaling_p1 > min_qe_scale_factor, rho_p1[qe > 0] * scaling_p1, wet_cost)
+        rho_m1[qe < 0] = np.where(scaling_m1 > min_qe_scale_factor, rho_m1[qe < 0] * scaling_m1, wet_cost)
+    else:
+        # Costs, which approach 0, cause over-embedding and increase detectability for small embedding rates
+        # Also prevents cost from getting negative because qe can be slightly higher than 0.5, due to
+        # different precisions
+        rho_p1[qe > 0] *= np.maximum(scaling_p1, min_qe_scale_factor)
+        rho_m1[qe < 0] *= np.maximum(scaling_m1, min_qe_scale_factor)
 
     # Do not embed +1 if the DCT coefficient has max value
     rho_p1[y0 >= 1023] = wet_cost
-
-    # Costs, which approach 0, cause over-embedding and increase detectability for small embedding rates
-    # Also prevents cost from getting negative because qe can be slightly higher than 0.5, due to
-    # different precisions
-    rho_m1[qe < 0] *= np.maximum(1 - 2 * np.abs(qe[qe < 0]), dry_cost)
-
     # Do not embed -1 if the DCT coefficient has min value
     rho_m1[y0 <= -1023] = wet_cost
 

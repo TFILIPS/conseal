@@ -6,7 +6,7 @@ Affiliation: University of Innsbruck
 from typing import Callable
 
 import numpy as np
-from ._costmap import compute_cost_adjusted, Method
+from ._costmap import compute_cost_adjusted, Method, MidpointHandling
 from .. import simulate
 from .. import tools
 
@@ -19,7 +19,8 @@ def simulate_single_channel(
     cost_fn: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]] = None,
     *,
     method: Method = Method.LIBJPEG_ISLOW,
-    dry_cost: float = 0.1,
+    midpoint_handling = MidpointHandling.CLIP_COST_SCALING,
+    min_qe_scale_factor: float = 0.1,
     wet_cost: float = 10**13,
     generator: str = None,
     seed: int = None,
@@ -46,8 +47,11 @@ def simulate_single_channel(
         unquntized coefficiets, which therefore can be integrated in the cost calculation.
     :type cost_fn: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]]
     :param method: choose the method that is used to extract the unquantized dct coefficients
-    :param dry_cost: Limits the downscaling of the cost. Should not be set to 0
-    :type dry_cost: float
+    :type method: Method
+    :param midpoint_handling: choose the midpoint (qe == 0.5) handling strategy
+    :type midpoint_handling: MidpointHandling
+    :param min_qe_scale_factor: Limits the downscaling of the cost.
+    :type min_qe_scale_factor: float
     :param wet_cost: wet cost for unembeddable coefficients
     :type wet_cost: float
     :param generator: type of PRNG used by embedding simulator
@@ -88,7 +92,8 @@ def simulate_single_channel(
         qt=qt,
         cost_fn=cost_fn,
         method=method,
-        dry_cost=dry_cost,
+        midpoint_handling=midpoint_handling,
+        min_qe_scale_factor=min_qe_scale_factor,
         wet_cost=wet_cost,
     )
 
