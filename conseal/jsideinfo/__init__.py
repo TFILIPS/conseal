@@ -5,7 +5,7 @@ Affiliation: University of Innsbruck
 """
 
 # costmap
-from ._costmap import compute_cost_adjusted, Method
+from ._costmap import compute_cost_adjusted, Method, MidpointHandling
 
 # simulate
 from . import _simulate
@@ -17,4 +17,5 @@ __all__ = [
     'compute_cost_adjusted',
     'simulate_single_channel',
     'Method',
+    'MidpointHandling',
 ]
