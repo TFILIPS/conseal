@@ -27,62 +27,62 @@ class MidpointHandling(enum.Enum):
     CLIP_COST_SCALING = enum.auto()
 
 
-def compute_dct_mat():
-    """
-    Computes the 8x8 DCT matrix
-    :return: ndarray of shape [8, 8]
-    """
-    [col, row] = np.meshgrid(range(8), range(8))
-    dct_mat = 0.5 * np.cos(np.pi * (2 * col + 1) * row / (2 * 8))
-    dct_mat[0, :] = dct_mat[0, :] / np.sqrt(2)
-    return dct_mat
-
-
-def block_dct2(spatial_blocks, dct_mat=None):
-    """
-    Apply 2D DCT to image blocks
-    :param spatial_blocks: ndarray of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
-    :param dct_mat: ndarray of shape [8, 8]. If None, the DCT matrix is computed on the fly.
-    :return: DCT coefficients of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
-    """
-    spatial_blocks = spatial_blocks.astype(float) - 128
-
-    if dct_mat is None:
-        dct_mat = compute_dct_mat()
-
-    dct_mat_left = dct_mat[None, None, :, :]
-    dct_mat_right = (dct_mat.T)[None, None, :, :]
-
-    dct_coeffs = dct_mat_left @ spatial_blocks @ dct_mat_right
-
-    return dct_coeffs
-
-
-# def naive_dct(x0):
-#     """Naive scipy.fftpack block DCT implementation that mimics the JPEG DCT calculation
-
-#     :param x0: pixel values of pre-cover image
-#         of shape [height, width]
-#     :type x0: `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
-#     :return: unquantized_coefficients,
-#         of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
-#     :rtype: tuple of `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+# def compute_dct_mat():
 #     """
-#     block_size = 8
+#     Computes the 8x8 DCT matrix
+#     :return: ndarray of shape [8, 8]
+#     """
+#     [col, row] = np.meshgrid(range(8), range(8))
+#     dct_mat = 0.5 * np.cos(np.pi * (2 * col + 1) * row / (2 * 8))
+#     dct_mat[0, :] = dct_mat[0, :] / np.sqrt(2)
+#     return dct_mat
 
-#     x0 = x0.astype(float) - 128
-#     height, width = x0.shape
-#     assert height % block_size == 0 and width % block_size == 0, \
-#         f'No support for padding (image dimensions must be divisible by the {block_size})'
 
-#     height, width = height // block_size, width // block_size
-#     dct_coeffs = np.zeros((height, width, block_size, block_size))
-#     for x in range(height):
-#         for y in range(width):
-#             block = x0[x * block_size:(x + 1) * block_size, y * block_size:(y + 1) * block_size]
-#             dct_coeffs[x, y] = tools.dct.dct2(block)
+# def block_dct2(spatial_blocks, dct_mat=None):
+#     """
+#     Apply 2D DCT to image blocks
+#     :param spatial_blocks: ndarray of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
+#     :param dct_mat: ndarray of shape [8, 8]. If None, the DCT matrix is computed on the fly.
+#     :return: DCT coefficients of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
+#     """
+#     spatial_blocks = spatial_blocks.astype(float) - 128
+
+#     if dct_mat is None:
+#         dct_mat = compute_dct_mat()
+
+#     dct_mat_left = dct_mat[None, None, :, :]
+#     dct_mat_right = (dct_mat.T)[None, None, :, :]
+
+#     dct_coeffs = dct_mat_left @ spatial_blocks @ dct_mat_right
 
 #     return dct_coeffs
+
+
+def naive_dct(x0):
+    """Naive scipy.fftpack block DCT implementation that mimics the JPEG DCT calculation
+
+    :param x0: pixel values of pre-cover image
+        of shape [height, width]
+    :type x0: `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    :return: unquantized_coefficients,
+        of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
+    :rtype: tuple of `np.ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`__
+    """
+    block_size = 8
+
+    x0 = x0.astype(float) - 128
+    height, width = x0.shape
+    assert height % block_size == 0 and width % block_size == 0, \
+        f'No support for padding (image dimensions must be divisible by the {block_size})'
+
+    height, width = height // block_size, width // block_size
+    dct_coeffs = np.zeros((height, width, block_size, block_size))
+    for x in range(height):
+        for y in range(width):
+            block = x0[x * block_size:(x + 1) * block_size, y * block_size:(y + 1) * block_size]
+            dct_coeffs[x, y] = tools.dct.dct2(block)
+
+    return dct_coeffs
 
 
 def compute_unquantized_coefficients(
@@ -112,9 +112,10 @@ def compute_unquantized_coefficients(
         jpeg.samp_factor = '4:4:4'
         unquantized_coefficients = jpeg.unquantized_coefficients(dct_method=DCTMethod.JDCT_FLOAT)[0]
     elif method == Method.NAIVE_DCT:
-        x0 = x0.reshape(x0.shape[0]//8, 8, -1, 8).transpose(0, 2, 1, 3)
-        u0 = block_dct2(x0)
-        unquantized_coefficients = u0.transpose(0, 2, 1, 3).reshape(*x0.shape)
+        unquantized_coefficients = naive_dct(x0)
+        # x0 = x0.reshape(x0.shape[0]//8, 8, x0.shape[1]//8, 8).transpose(0, 2, 1, 3)
+        # u0 = block_dct2(x0)
+        # unquantized_coefficients = u0.transpose(0, 2, 1, 3).reshape(*x0.shape)
     else:
         raise ValueError('DCT method not supported in this version.')
 
