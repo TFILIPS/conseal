@@ -45,6 +45,8 @@ def block_dct2(spatial_blocks, dct_mat=None):
     :param dct_mat: ndarray of shape [8, 8]. If None, the DCT matrix is computed on the fly.
     :return: DCT coefficients of shape [num_vertical_blocks, num_horizontal_blocks, 8, 8]
     """
+    spatial_blocks = spatial_blocks.astype(float) - 128
+
     if dct_mat is None:
         dct_mat = compute_dct_mat()
 
